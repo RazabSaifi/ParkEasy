@@ -329,3 +329,49 @@ body::after {
   top: 4px !important;
   right: 4px !important;
 }
+
+/* QR Code Scanner Laser Animation & Viewfinder Overrides */
+#qr-reader {
+  width: 100% !important;
+  height: 100% !important;
+  border: none !important;
+  position: relative !important;
+}
+
+#qr-reader video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  border-radius: 1rem !important;
+}
+
+#qr-reader__scan_region {
+  border: none !important;
+}
+
+#qr-reader__dashboard {
+  display: none !important;
+}
+
+@keyframes laserSweep {
+  0% {
+    top: 8%;
+    opacity: 0.6;
+  }
+  50% {
+    top: 90%;
+    opacity: 1;
+  }
+  100% {
+    top: 8%;
+    opacity: 0.6;
+  }
+}
+
+.scanner-laser {
+  position: absolute;
+  left: 0;
+  right: 0;
+  animation: laserSweep 2.2s ease-in-out infinite;
+}
+
