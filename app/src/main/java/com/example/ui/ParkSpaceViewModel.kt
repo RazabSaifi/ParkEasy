@@ -470,6 +470,14 @@ class ParkSpaceViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun checkInBooking(bookingId: Long, onComplete: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.checkInBooking(bookingId)
+            showMessage("QR Verified! Entry barrier unlocked & spot checked-in ✓")
+            onComplete()
+        }
+    }
+
     fun completeBookingSession(bookingId: Long, onComplete: () -> Unit = {}) {
         viewModelScope.launch {
             repository.completeBooking(bookingId)

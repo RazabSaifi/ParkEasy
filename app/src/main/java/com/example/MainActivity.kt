@@ -8,6 +8,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -23,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -34,6 +37,7 @@ import com.example.ui.components.LanguageSelectionDialog
 import com.example.ui.components.NotificationDialog
 import com.example.ui.components.ParkSpaceBottomNav
 import com.example.ui.components.ParkSpaceTopBar
+import com.example.ui.components.SplashAnimationOverlay
 import com.example.ui.i18n.LocalAppLanguage
 import com.example.ui.i18n.LocalStrings
 import com.example.ui.i18n.getAppStrings
@@ -148,19 +152,22 @@ fun ParkSpaceApp(
             currentScreen != AppScreen.DIGITAL_PASS &&
             currentScreen != AppScreen.LIST_SPACE_WIZARD
 
+    var showSplash by rememberSaveable { mutableStateOf(true) }
+
     CompositionLocalProvider(
         LocalStrings provides strings,
         LocalAppLanguage provides appLanguage
     ) {
-        if (showLanguageDialog) {
-            LanguageSelectionDialog(
-                currentLanguage = appLanguage,
-                onSelectLanguage = { viewModel.setLanguage(it) },
-                onDismiss = { showLanguageDialog = false }
-            )
-        }
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (showLanguageDialog) {
+                LanguageSelectionDialog(
+                    currentLanguage = appLanguage,
+                    onSelectLanguage = { viewModel.setLanguage(it) },
+                    onDismiss = { showLanguageDialog = false }
+                )
+            }
 
-        Scaffold(
+            Scaffold(
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
             topBar = {
                 if (shouldShowTopBar) {
@@ -323,7 +330,8 @@ fun ParkSpaceApp(
                             onCompleteBooking = { bookingId -> viewModel.completeBookingSession(bookingId) },
                             onSubmitReview = { bkId, spId, rating, comment ->
                                 viewModel.submitReview(bkId, spId, rating, comment)
-                            }
+                            },
+                            onCheckInBooking = { bookingId -> viewModel.checkInBooking(bookingId) }
                         )
                     }
                     AppScreen.MY_BOOKINGS -> {
@@ -335,7 +343,8 @@ fun ParkSpaceApp(
                                 viewModel.submitReview(bkId, spId, rating, comment)
                             },
                             onFindParking = { viewModel.navigateTo(AppScreen.EXPLORE) },
-                            onCompleteBooking = { bookingId -> viewModel.completeBookingSession(bookingId) }
+                            onCompleteBooking = { bookingId -> viewModel.completeBookingSession(bookingId) },
+                            onCheckInBooking = { bookingId -> viewModel.checkInBooking(bookingId) }
                         )
                     }
                     AppScreen.LIST_SPACE_WIZARD -> {
@@ -447,5 +456,15 @@ fun ParkSpaceApp(
             }
         }
     }
-}
+
+            AnimatedVisibility(
+                visible = showSplash,
+                exit = fadeOut(animationSpec = tween(durationMillis = 550))
+            ) {
+                SplashAnimationOverlay(
+                    onAnimationComplete = { showSplash = false }
+                )
+            }
+        }
+    }
 }

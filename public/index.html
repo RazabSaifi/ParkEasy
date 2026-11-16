@@ -39,12 +39,31 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <!-- QRCode.js for Digital Pass Generation -->
+  <!-- QR Code Generator & Scanner Engines -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
   <!-- Custom Design System Styles -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-[#070B14] text-slate-100 min-h-screen flex flex-col font-sans selection:bg-blue-600 selection:text-white pb-20 md:pb-0">
+
+  <!-- App Opening Splash Animation Overlay -->
+  <div id="pe-app-splash-overlay" class="fixed inset-0 z-[100] bg-black flex items-center justify-center transition-opacity duration-500">
+    <iframe
+      id="pe-splash-iframe"
+      src="assets/aistudio/parkeasy_splash_screen_animation_aab75e0a.html"
+      title="ParkEasy Opening Animation"
+      class="w-full h-full border-0 bg-black"
+    ></iframe>
+    <button
+      id="btn-skip-splash"
+      type="button"
+      class="fixed top-5 right-5 z-[110] px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/15 text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer"
+    >
+      Skip <i class="fa-solid fa-forward-step ml-1 text-[10px]"></i>
+    </button>
+  </div>
 
   <!-- Top Navigation Bar -->
   <header class="glass-nav sticky top-0 z-40 px-4 lg:px-8 py-3 transition-all duration-200">
@@ -457,15 +476,43 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <h1 class="text-2xl sm:text-3xl font-black text-white">My Parking Passes & Bookings</h1>
-        <p class="text-xs text-slate-400 mt-1">Manage active QR passes, complete parking sessions, and submit reviews</p>
+        <p class="text-xs text-slate-400 mt-1">Manage active QR passes, check in to spots, and complete parking sessions</p>
       </div>
 
-      <!-- Tabs: Active, Completed, Cancelled -->
-      <div class="flex items-center gap-1 p-1 bg-slate-900/90 rounded-2xl border border-slate-800 text-xs font-bold self-start">
-        <button id="tab-bk-active" class="px-4 py-2 rounded-xl bg-blue-600 text-white shadow-md transition">Active</button>
-        <button id="tab-bk-completed" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition">Completed</button>
-        <button id="tab-bk-cancelled" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition">Cancelled</button>
+      <!-- Action Button & Status Tabs -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        <button id="btn-open-qr-scanner" class="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs flex items-center gap-2 shadow-lg shadow-emerald-950/50 border border-emerald-400/40 transition active:scale-95 cursor-pointer">
+          <i class="fa-solid fa-qrcode text-base"></i>
+          <span>Scan QR Check-In</span>
+        </button>
+
+        <!-- Tabs: Active, Completed, Cancelled -->
+        <div class="flex items-center gap-1 p-1 bg-slate-900/90 rounded-2xl border border-slate-800 text-xs font-bold self-start">
+          <button id="tab-bk-active" class="px-4 py-2 rounded-xl bg-blue-600 text-white shadow-md transition">Active</button>
+          <button id="tab-bk-completed" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition">Completed</button>
+          <button id="tab-bk-cancelled" class="px-4 py-2 rounded-xl text-slate-400 hover:text-white transition">Cancelled</button>
+        </div>
       </div>
+    </div>
+
+    <!-- Quick Scan Banner for Active Passes -->
+    <div id="checkin-quick-banner" class="hidden rounded-3xl p-4 sm:p-5 bg-gradient-to-r from-emerald-950/60 via-slate-900/90 to-blue-950/60 border border-emerald-500/40 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="flex items-center gap-3.5">
+        <div class="w-11 h-11 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl shrink-0 border border-emerald-500/40 animate-pulse">
+          <i class="fa-solid fa-camera"></i>
+        </div>
+        <div>
+          <div class="text-xs sm:text-sm font-black text-white flex items-center gap-2">
+            <span>Ready to park at your reserved spot?</span>
+            <span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold border border-emerald-500/30">Arrived</span>
+          </div>
+          <div class="text-xs text-slate-400 mt-0.5" id="checkin-banner-spot">Scan the entry gate or bay QR code to check in and unlock access.</div>
+        </div>
+      </div>
+      <button onclick="window.openQrScanner()" class="px-5 py-3 rounded-2xl btn-stitch-emerald text-xs font-black shrink-0 flex items-center justify-center gap-2 shadow-lg cursor-pointer">
+        <i class="fa-solid fa-qrcode text-sm"></i>
+        <span>Scan QR to Check-In</span>
+      </button>
     </div>
 
     <!-- Passes Container -->
@@ -1233,6 +1280,138 @@
         </button>
       </form>
 
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: QR CODE SCANNER (Camera + File + 1-Tap Check-In)  -->
+  <!-- ======================================================== -->
+  <div id="modal-qr-scanner" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl">
+    <div class="glass-card w-full max-w-md rounded-3xl border border-slate-700/80 overflow-hidden p-5 space-y-4 shadow-2xl relative text-left">
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-lg border border-emerald-500/30">
+            <i class="fa-solid fa-qrcode"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black text-white">Scan Spot QR to Check-In</h3>
+            <p class="text-[11px] text-slate-400">Align camera with gate barrier or spot QR code</p>
+          </div>
+        </div>
+        <button id="btn-close-qr-scanner" class="btn-close-modal text-slate-400 hover:text-white text-base transition p-1">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Scanner Viewfinder Box -->
+      <div class="relative w-full aspect-square max-h-[290px] rounded-2xl overflow-hidden bg-slate-950 border-2 border-slate-800 shadow-inner flex items-center justify-center">
+        <!-- Live Video Element for Html5Qrcode -->
+        <div id="qr-reader" class="w-full h-full flex items-center justify-center"></div>
+
+        <!-- Animated Scanner Target Overlay -->
+        <div id="scanner-reticle" class="pointer-events-none absolute inset-6 border border-emerald-500/30 rounded-2xl flex flex-col justify-between p-2">
+          <!-- 4 Corner Brackets -->
+          <div class="flex justify-between">
+            <span class="w-6 h-6 border-t-4 border-l-4 border-emerald-400 rounded-tl-lg"></span>
+            <span class="w-6 h-6 border-t-4 border-r-4 border-emerald-400 rounded-tr-lg"></span>
+          </div>
+          <!-- Laser Beam Line -->
+          <div class="scanner-laser w-full h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_12px_rgba(52,211,153,0.9)]"></div>
+          <div class="flex justify-between">
+            <span class="w-6 h-6 border-b-4 border-l-4 border-emerald-400 rounded-bl-lg"></span>
+            <span class="w-6 h-6 border-b-4 border-r-4 border-emerald-400 rounded-br-lg"></span>
+          </div>
+        </div>
+
+        <!-- Camera Status / Permission Notice Overlay -->
+        <div id="camera-fallback-msg" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center space-y-3">
+          <div class="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl">
+            <i class="fa-solid fa-video-slash"></i>
+          </div>
+          <div class="text-xs font-bold text-white">Camera Standby or Permission Needed</div>
+          <p class="text-[11px] text-slate-400 max-w-xs">You can use 1-tap instant check-in below, or upload a QR image.</p>
+          <label class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold cursor-pointer border border-slate-700 flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-image text-blue-400"></i> Upload QR Screenshot
+            <input type="file" id="qr-upload-input" accept="image/*" class="hidden">
+          </label>
+        </div>
+      </div>
+
+      <!-- Controls Row: Torch, Flip Camera, Upload Image -->
+      <div class="flex items-center justify-between text-xs text-slate-400 px-1">
+        <button id="btn-toggle-torch" type="button" class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 hover:text-white transition flex items-center gap-1.5">
+          <i class="fa-solid fa-bolt text-amber-400"></i> Flashlight
+        </button>
+        <button id="btn-flip-camera" type="button" class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 hover:text-white transition flex items-center gap-1.5">
+          <i class="fa-solid fa-arrows-rotate text-blue-400"></i> Flip Camera
+        </button>
+        <label class="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 hover:text-white cursor-pointer transition flex items-center gap-1.5">
+          <i class="fa-solid fa-file-arrow-up text-emerald-400"></i> Pick Image
+          <input type="file" id="qr-upload-input-btn" accept="image/*" class="hidden">
+        </label>
+      </div>
+
+      <!-- Quick Test / 1-Tap Simulation Bar for Reserved Spots -->
+      <div class="pt-2 border-t border-slate-800/80 space-y-2">
+        <div class="flex items-center justify-between text-[11px] text-slate-400">
+          <span class="font-bold flex items-center gap-1 text-white">
+            <i class="fa-solid fa-circle-check text-emerald-400"></i> Instant 1-Tap Check-In for Reserved Pass:
+          </span>
+          <span class="text-[10px] text-emerald-400 font-semibold">Sensor Auto-Detect</span>
+        </div>
+        <div id="scanner-quick-spots" class="flex flex-col gap-2 max-h-36 overflow-y-auto">
+          <!-- Dynamically populated buttons for active passes -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: CHECK-IN SUCCESS CONFIRMATION                     -->
+  <!-- ======================================================== -->
+  <div id="modal-checkin-success" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-xl">
+    <div class="glass-card w-full max-w-sm rounded-3xl border border-emerald-500/50 overflow-hidden text-center p-6 space-y-4 shadow-2xl relative">
+      <div class="w-16 h-16 rounded-3xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center mx-auto text-3xl shadow-lg shadow-emerald-500/30">
+        <i class="fa-solid fa-circle-check"></i>
+      </div>
+      <div>
+        <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[11px] font-black uppercase tracking-wider border border-emerald-500/30">
+          Gate Barrier Unlocked ✓
+        </span>
+        <h3 class="text-xl font-black text-white mt-1.5">Check-In Successful!</h3>
+        <p class="text-xs text-slate-400" id="success-spot-name">Parking Spot</p>
+      </div>
+
+      <!-- Check-In Details Box -->
+      <div class="bg-slate-950/80 p-4 rounded-2xl border border-slate-800 text-left space-y-2 text-xs">
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Assigned Bay / Slot:</span>
+          <span class="font-black text-emerald-400 font-mono text-sm" id="success-bay-name">Bay P-04 (Level 1)</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Vehicle Reg:</span>
+          <span class="font-bold text-white font-mono" id="success-vehicle-reg">KA-01-AB-1234</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Check-In Time:</span>
+          <span class="font-semibold text-slate-200" id="success-checkin-time">Just Now</span>
+        </div>
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Pass Reference:</span>
+          <span class="font-mono text-blue-400 text-[11px]" id="success-pass-code">#PS-84920</span>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="space-y-2 pt-1">
+        <a id="success-nav-btn" href="#" target="_blank" class="w-full py-3 rounded-2xl btn-stitch-primary font-bold text-xs flex items-center justify-center gap-2 shadow-lg">
+          <i class="fa-solid fa-location-arrow"></i> Turn-by-Turn Navigation to Bay
+        </a>
+        <button onclick="window.closeCheckinSuccessModal()" class="w-full py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 transition">
+          Done & Return to Passes
+        </button>
+      </div>
     </div>
   </div>
 

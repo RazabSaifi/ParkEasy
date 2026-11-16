@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.EventBusy
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AlertDialog
@@ -61,6 +62,7 @@ import coil.compose.AsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.example.data.model.Booking
+import com.example.ui.components.QrCheckInScannerDialog
 import com.example.ui.components.RatingReviewDialog
 import com.example.ui.components.StarGold
 import com.example.ui.theme.AccentEmerald
@@ -76,6 +78,7 @@ import com.example.ui.theme.Slate400
 import com.example.ui.theme.Slate500
 import com.example.ui.theme.Slate600
 import com.example.ui.theme.Slate700
+import com.example.ui.theme.Slate800
 import com.example.ui.theme.Slate900
 
 @Composable
@@ -86,6 +89,7 @@ fun MyBookingsScreen(
     onSubmitReview: (bookingId: Long, spaceId: Long, rating: Float, comment: String) -> Unit,
     onFindParking: () -> Unit,
     onCompleteBooking: (Long) -> Unit = {},
+    onCheckInBooking: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
@@ -93,12 +97,14 @@ fun MyBookingsScreen(
 
     var bookingToCancel by remember { mutableStateOf<Booking?>(null) }
     var reviewBookingTarget by remember { mutableStateOf<Booking?>(null) }
+    var showQrScannerDialog by remember { mutableStateOf(false) }
+    var qrScannerTargetBooking by remember { mutableStateOf<Booking?>(null) }
 
     val isDark = MaterialTheme.colorScheme.background == CharcoalBackground
 
     val filteredBookings = bookings.filter { b ->
         when (selectedTabIndex) {
-            0 -> b.status == "Confirmed"
+            0 -> b.status == "Confirmed" || b.status == "Checked In" || b.status == "Active"
             1 -> b.status == "Completed"
             else -> b.status == "Cancelled"
         }
@@ -117,22 +123,106 @@ fun MyBookingsScreen(
                 .background(MaterialTheme.colorScheme.surface)
                 .padding(horizontal = 20.dp, vertical = 16.dp)
         ) {
-            Text(
-                text = "My Bookings",
-                style = MaterialTheme.typography.headlineSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = (-0.5).sp
-                ),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Manage your parking reservations and digital passes.",
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "My Bookings & Passes",
+                        style = MaterialTheme.typography.headlineSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = (-0.5).sp
+                        ),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = "Manage your parking reservations and digital passes.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(18.dp))
+                Button(
+                    onClick = {
+                        qrScannerTargetBooking = null
+                        showQrScannerDialog = true
+                    },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentEmerald),
+                    modifier = Modifier.testTag("scan_qr_checkin_button")
+                ) {
+                    Icon(Icons.Default.QrCodeScanner, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Scan QR", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+            }
+
+            // Quick Arrival Check-in Prompt Banner
+            val pendingCheckin = bookings.find { it.status == "Confirmed" }
+            if (pendingCheckin != null && selectedTabIndex == 0) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = AccentEmerald.copy(alpha = 0.12f),
+                    border = BorderStroke(1.dp, AccentEmerald.copy(alpha = 0.4f)),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            qrScannerTargetBooking = pendingCheckin
+                            showQrScannerDialog = true
+                        }
+                        .testTag("quick_checkin_banner")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(
+                                Icons.Default.QrCodeScanner,
+                                contentDescription = null,
+                                tint = AccentEmerald,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Text(
+                                    text = "Arrived at ${pendingCheckin.parkingTitle}?",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = "Scan entry QR code to check in and unlock gate",
+                                    fontSize = 11.sp,
+                                    color = AccentEmerald
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = AccentEmerald
+                        ) {
+                            Text(
+                                text = "Check In",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Clean Modern Segmented Tab Navigation
             Surface(
@@ -150,7 +240,7 @@ fun MyBookingsScreen(
                         val isSelected = selectedTabIndex == index
                         val count = bookings.count {
                             when (index) {
-                                0 -> it.status == "Confirmed"
+                                0 -> it.status == "Confirmed" || it.status == "Checked In" || it.status == "Active"
                                 1 -> it.status == "Completed"
                                 else -> it.status == "Cancelled"
                             }
@@ -302,6 +392,10 @@ fun MyBookingsScreen(
                         onEndSession = {
                             onCompleteBooking(booking.id)
                             reviewBookingTarget = booking
+                        },
+                        onScanCheckIn = {
+                            qrScannerTargetBooking = booking
+                            showQrScannerDialog = true
                         }
                     )
                 }
@@ -367,6 +461,21 @@ fun MyBookingsScreen(
             }
         )
     }
+
+    // QR Code Check-In Scanner Dialog
+    if (showQrScannerDialog) {
+        QrCheckInScannerDialog(
+            activeBookings = bookings.filter { it.status == "Confirmed" || it.status == "Checked In" || it.status == "Active" },
+            targetBooking = qrScannerTargetBooking,
+            onDismiss = {
+                showQrScannerDialog = false
+                qrScannerTargetBooking = null
+            },
+            onCheckInSuccess = { bookingId ->
+                onCheckInBooking(bookingId)
+            }
+        )
+    }
 }
 
 @Composable
@@ -375,7 +484,8 @@ private fun BookingCard(
     onViewPass: () -> Unit,
     onCancel: () -> Unit,
     onReview: () -> Unit,
-    onEndSession: () -> Unit = {}
+    onEndSession: () -> Unit = {},
+    onScanCheckIn: () -> Unit = {}
 ) {
     val isDark = MaterialTheme.colorScheme.background == CharcoalBackground
     // Dynamic photo URL based on ID
@@ -432,17 +542,17 @@ private fun BookingCard(
                         Surface(
                             shape = RoundedCornerShape(6.dp),
                             color = when (booking.status) {
-                                "Confirmed" -> if (isDark) Color(0xFF143823) else Color(0xFFDCFCE7)
+                                "Confirmed", "Checked In", "Active" -> if (isDark) Color(0xFF143823) else Color(0xFFDCFCE7)
                                 "Completed" -> if (isDark) Color(0xFF1E2E4A) else Color(0xFFEFF6FF)
                                 else -> if (isDark) Color(0xFF3F1D1D) else Color(0xFFFEE2E2)
                             }
                         ) {
                             Text(
-                                text = booking.status.uppercase(),
+                                text = if (booking.status == "Checked In") "CHECKED IN ✓" else booking.status.uppercase(),
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = when (booking.status) {
-                                    "Confirmed" -> if (isDark) AccentEmerald else Color(0xFF15803D)
+                                    "Confirmed", "Checked In", "Active" -> if (isDark) AccentEmerald else Color(0xFF15803D)
                                     "Completed" -> PrimaryBlue
                                     else -> if (isDark) Color(0xFFF87171) else Color(0xFFB91C1C)
                                 },
@@ -567,7 +677,35 @@ private fun BookingCard(
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                if (booking.status == "Confirmed") {
+                if (booking.status == "Confirmed" || booking.status == "Checked In" || booking.status == "Active") {
+                    // QR Check-In Button
+                    Button(
+                        onClick = onScanCheckIn,
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (booking.status == "Checked In") (if (isDark) CharcoalElevated else Slate800) else AccentEmerald
+                        ),
+                        modifier = Modifier
+                            .height(38.dp)
+                            .testTag("scan_checkin_btn_${booking.id}")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.QrCodeScanner,
+                            contentDescription = null,
+                            tint = if (booking.status == "Checked In") AccentEmerald else Color.White,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (booking.status == "Checked In") "Checked In ✓" else "Check In",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (booking.status == "Checked In") AccentEmerald else Color.White
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
                     // Restrained Destructive Cancel Action
                     OutlinedButton(
                         onClick = onCancel,

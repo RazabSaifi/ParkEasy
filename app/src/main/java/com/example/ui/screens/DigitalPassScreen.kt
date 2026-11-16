@@ -82,6 +82,7 @@ fun DigitalPassScreen(
     onBack: () -> Unit,
     onCompleteBooking: (Long) -> Unit = {},
     onSubmitReview: (bookingId: Long, spaceId: Long, rating: Float, comment: String) -> Unit = { _, _, _, _ -> },
+    onCheckInBooking: (Long) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -94,7 +95,7 @@ fun DigitalPassScreen(
         return
     }
 
-    var isPassScanned by remember { mutableStateOf(booking.status == "Completed") }
+    var isPassScanned by remember { mutableStateOf(booking.status == "Completed" || booking.status == "Checked In") }
     var showRatingDialog by remember { mutableStateOf(false) }
 
     Column(
@@ -342,6 +343,9 @@ fun DigitalPassScreen(
                 OutlinedButton(
                     onClick = {
                         isPassScanned = !isPassScanned
+                        if (isPassScanned) {
+                            onCheckInBooking(booking.id)
+                        }
                     },
                     shape = RoundedCornerShape(12.dp),
                     border = BorderStroke(1.dp, if (isPassScanned) AccentEmerald else MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),

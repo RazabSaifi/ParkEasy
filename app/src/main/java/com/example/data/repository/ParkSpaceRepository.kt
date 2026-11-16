@@ -226,6 +226,18 @@ class ParkSpaceRepository(
         savedBooking
     }
 
+    suspend fun checkInBooking(bookingId: Long, userId: Long = 1L) = withContext(Dispatchers.IO) {
+        bookingDao.updateBookingStatus(bookingId, "Checked In")
+        notificationDao.insertNotification(
+            NotificationItem(
+                userId = userId,
+                title = "Check-In Verified ✓",
+                message = "Entry gate barcode sensor verified for booking #$bookingId. Welcome!",
+                type = "Booking"
+            )
+        )
+    }
+
     suspend fun completeBooking(bookingId: Long) = withContext(Dispatchers.IO) {
         bookingDao.updateBookingStatus(bookingId, "Completed")
         val booking = bookingDao.getBookingById(bookingId).firstOrNull()
